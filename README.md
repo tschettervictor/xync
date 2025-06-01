@@ -6,6 +6,16 @@ can be used on any system with a POSIX compliant shell.
 This project was forked from https://github.com/aaronhurt/zfs-replicate.
 A special thanks to him for creating the original script.
 
+The biggest difference is that this script will only replicate data for the
+snapshots it creates, as opposed to a full replication that includes all snapshots.
+It only uses `-i` for incremental sends, and no flags for initial sends. This means
+you are free to create/destroy/manage snapshots on either side, as long as you stay
+away from the `autorep-*` naming scheme.
+
+It is possible to replicate using `-I`, but i chose not to becasue XigmaNAS snapshots
+have a certain naming scheme that (if used on both systems) coud interfere. If the same
+snapshot name exists on both sides, then using `-I` will fail.
+
 ## Features
 
 - The script follows strict POSIX standards and should be usable on any host with a POSIX compliant shell.
