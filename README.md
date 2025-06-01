@@ -1,6 +1,7 @@
 # xync
 
-A POSIX shell script to automate ZFS Replication.
+A POSIX shell script to automate ZFS Replication on XigmaNAS systems, but
+can be used on any system with a POSIX compliant shell.
 
 This project was forked from https://github.com/aaronhurt/zfs-replicate.
 A special thanks to him for creating the original script.
