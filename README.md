@@ -37,26 +37,22 @@ snapshot name exists on both sides, then using `-I` will fail.
 - Includes a `--status` option for XigmaNAS that can be used to email the last log output at your preferred schedule.
   Simply add it as a custom script in the email settings under "System > Advanced > Email Reports"
 
-## Warning
+## Notes
 
-Replicating to a root dataset will rewrite the remote pool with forced replication.
-This script will create a true 1:1 copy of the source dataset in the destination dataset with default options.
+Replicating to a root dataset will *NOT* rewrite the remote pool with forced replication.
+The original script uses `-d` on the `zfs receive` command, which strips away the first
+portion of the received dataset. This script does not use the `-d` flag.
 
-The configuration `REPLICATE_SETS="zpoolOne:zpoolTwo"` will result in `zpoolTwo` being a 1:1 copy of `zpoolOne` and may
-result in data loss on `zpoolTwo`.
-
-To replicate a root dataset safely to another pool consider `REPLICATE_SETS="zpoolOne:zpoolTwo/zpoolOne"` instead.
-
-This will result in a 1:1 copy of `zpoolOne` in a separate dataset of `zpoolTwo` and will not affect other datasets
-currently present on the destination.
+The configuration `REPLICATE_SETS="zpoolOne:zpoolTwo"` will result in `zpoolTwo/zpoolTwo` on
+the destination system.
 
 ## Configuration
 
-Configuration is done via an optional config file as environment variables. Most options have sane
+Configuration is done via an optional config file, or as environment variables. Most options have sane
 defaults to keep configuration to a minimum. The script will attempt to locate a file called `config.sh` in the same
 directory as the script if one is not passed via the command line.
 
-The config file is very well commented and the contents of the sample config are shown below. The only required
+The config file is very well commented. The only required
 setting without a default is the `REPLICATE_SETS` option. The script will error out on launch if required configuration
 is not met.
 
