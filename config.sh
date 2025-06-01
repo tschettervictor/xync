@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-## zfs-replicate configuration file
+## xync configuration file
 # shellcheck disable=SC2034
 
 ## Datasets to replicate. These must be zfs paths not mount points.
