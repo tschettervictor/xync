@@ -49,12 +49,11 @@ the destination system.
 ## Configuration
 
 Configuration is done via an optional config file, or as environment variables. Most options have sane
-defaults to keep configuration to a minimum. The script will attempt to locate a file called `config.sh` in the same
-directory as the script if one is not passed via the command line.
+defaults to keep configuration to a minimum. The script will attempt to locate a file called `config.sh`
+in the same directory as the script if one is not passed via the command line.
 
-The config file is very well commented. The only required
-setting without a default is the `REPLICATE_SETS` option. The script will error out on launch if required configuration
-is not met.
+The config file is very well commented. The only required setting without a default is the `REPLICATE_SETS` option.
+The script will error out on launch if required configuration is not met.
 
 ### Available Command Line Options
 
