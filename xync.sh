@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-## zfs-replicate.sh
+## xync.sh
 set -eu ## fail on errors and undefined variables
 
 # check pipefail in a subshell and set if supported
