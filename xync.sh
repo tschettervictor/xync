@@ -38,12 +38,10 @@ LOGGER="${LOGGER:-$(which logger || true)}"
 FIND="${FIND:-$(which find || true)}"
 SSH="${SSH:-$(which ssh || true)}"
 ZFS="${ZFS:-$(which zfs || true)}"
-ZFS_SEND_OPTS="${ZFS_SEND_OPTS:-"-p"}"
+ZFS_INCR_OPT="${ZFS_INCR_OPT:-"-I"}"
+ZFS_SEND_OPTS="${ZFS_SEND_OPTS:-""}"
 ZFS_RECV_OPTS="${ZFS_RECV_OPTS:-"-vF"}"
 HOST_CHECK="${HOST_CHECK:-"ping -c1 -q -W2 %HOST%"}"
-## we default these after config is loaded
-DEST_PIPE_WITH_HOST=
-DEST_PIPE_WITHOUT_HOST=
 ## temp path used for lock files
 TMPDIR="${TMPDIR:-"/tmp"}"
 ## temp file to store dataset list
@@ -232,7 +230,7 @@ snapSend() {
   checkLock "${TMPDIR}/.replicate.send.lock"
   if [ -n "$srcHost" ]; then
     if [ -n "$base" ]; then
-      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS -I \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
+      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
         snapDestroy "${src}@${name}" "$srcHost"
         exitClean 128 "failed to send snapshot: ${src}@${name}"
       fi
@@ -244,7 +242,7 @@ snapSend() {
     fi
   elif [ -n "$dstHost" ]; then
     if [ -n "$base" ]; then
-      if ! $ZFS send $ZFS_SEND_OPTS -I "$base" "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
+      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
         snapDestroy "${src}@${name}" "$srcHost"
         exitClean 128 "failed to send snapshot: ${src}@${name}"
       fi
@@ -256,7 +254,7 @@ snapSend() {
     fi
   elif [ -z "$srcHost" ] && [ -z "$dstHost" ]; then
     if [ -n "$base" ]; then
-      if ! $ZFS send $ZFS_SEND_OPTS -I "$base" "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
+      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
         snapDestroy "${src}@${name}" "$srcHost"
         exitClean 128 "failed to send snapshot: ${src}@${name}"
       fi
@@ -620,6 +618,6 @@ main() {
 }
 
 ## process config and start main if we weren't sourced
-if [ "$(expr "$SCRIPT" : 'zfs-replicate')" -gt 0 ]; then
+if [ "$(expr "$SCRIPT" : 'xync')" -gt 0 ]; then
   loadConfig "$@" && main 2>&1 | captureOutput
 fi
