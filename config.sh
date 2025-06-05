@@ -19,7 +19,7 @@
 ## Multiple space separated sets may be specified.
 ## Pools and dataset pairs must exist on the respective servers.
 ##
-#REPLICATE_SETS=""
+REPLICATE_SETS="tank@192.168.1.132:backup"
 
 ## Allow replication of root datasets.
 ## If "REPLICATE_SETS" contains root datasets and "ALLOW_ROOT_DATASETS" is
@@ -28,7 +28,7 @@
 ## 0 - disable (default)
 ## 1 - enable (use at your own risk)
 ##
-#ALLOW_ROOT_DATASETS=0
+ALLOW_ROOT_DATASETS=1
 
 ## Manual alteration of the source or destination datasets by removing
 ## snapshots often results in failure. It is expected that datasets configured
@@ -62,7 +62,7 @@
 ## 0 - disable (default)
 ## 1 - enable (use at your own risk)
 ##
-#ALLOW_RECONCILIATION=0
+ALLOW_RECONCILIATION=1
 
 ## Option to recursively replicate children of datasets contained
 ## in the replication set.
@@ -70,14 +70,14 @@
 ## 0 - disable (default)
 ## 1 - enable
 ##
-#RECURSE_CHILDREN=0
+RECURSE_CHILDREN=1
 
 ## The number of snapshots to keep for each dataset.
 ## Older snapshots, by creation date, will be deleted.
 ## A minimum of 2 snapshots must be kept for replication to work.
 ## This defaults to 2 if not set.
 ##
-#SNAP_KEEP=2
+SNAP_KEEP=5
 
 ## Option to write logs to syslog via the "logger" tool. This option
 ## may be enabled or disabled independently from log file settings.
@@ -85,7 +85,7 @@
 ## 0 - disable
 ## 1 - enable (default)
 ##
-#SYSLOG=1
+SYSLOG=1
 
 ## Optional logging facility to use with syslog. The default facility
 ## is "user" unless changed below. Other common options include local
@@ -128,7 +128,7 @@
 ## logging is done via syslog. This setting will always be treated as a
 ## directory and not a file.
 ##
-#LOG_BASE=""
+LOG_BASE="/mnt/backup/scripts/xync/logs"
 
 ## Path to the system "logger" executable.
 ## The default uses the first "logger" executable found in $PATH.
@@ -155,11 +155,16 @@
 ##
 #ZFS=$(which zfs)
 
+## Incremental option. Can be "-i" or "-I".
+## The default is "-I" to send all intermediate snapshots.
+##
+#ZFS_INCR_OPT="-I"
+
 ## Options to use with "zfs send".
-## The defaults are "-p" .
+## The defaults are "".
 ## Other options have not been tested.
 ##
-#ZFS_SEND_OPTS="-p"
+#ZFS_SEND_OPTS=""
 
 ## Options to use with "zfs receive".
 ## The defaults are "-vF".
