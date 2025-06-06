@@ -7,20 +7,17 @@ This project was forked from https://github.com/aaronhurt/zfs-replicate.
 A special thanks to him for creating the original script.
 
 The biggest difference is that this script will only replicate data for the
-snapshots it creates, as opposed to a full replication that includes all snapshots.
-It only uses `-i` for incremental sends, and no flags for initial sends. This means
-you are free to create/destroy/manage snapshots on either side, as long as you stay
-away from the `autorep-*` naming scheme.
+snapshots it creates, and any incremental ones generated after the script has been put
+into production. This is opposed to a full replication that includes all snapshots.
+It only uses `-I` for incremental sends, and no flags for initial sends. This means
+you should be free to create/destroy/manage snapshots on either side, as long as you stay
+away from the `autorep-*` naming scheme, and dont overlap snapshot names.
 
 It does the above on a per-dataset basis. Meaning that if you encounter a network hiccup,
 it will only affect that one dataset. The rest will be able to pick up where the script
 left off. The original script uses `-R` to replicate, and I often found my self having to
 replicate terabytes of data from scratch because of a network hiccup. Granted, I could have
 just manually fixed it, but I want to automate this as much as possible.
-
-It is possible to replicate using `-I`, but I chose not to becasue XigmaNAS snapshots
-have a certain naming scheme that (if used on both systems) coud interfere. If the same
-snapshot name exists on both sides, then using `-I` will fail.
 
 ## Features
 
