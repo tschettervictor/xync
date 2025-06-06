@@ -40,7 +40,7 @@ Replicating to a root dataset will *NOT* rewrite the remote pool with forced rep
 The original script uses `-d` on the `zfs receive` command, which strips away the first
 portion of the received dataset. This script does not use the `-d` flag.
 
-The configuration `REPLICATE_SETS="zpoolOne:zpoolTwo"` will result in `zpoolTwo/zpoolTwo` on
+The configuration `REPLICATE_SETS="zpoolOne:zpoolTwo"` will result in `zpoolTwo/zpoolOne` on
 the destination system.
 
 ## Configuration
