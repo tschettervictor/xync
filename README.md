@@ -7,8 +7,8 @@ This project was forked from https://github.com/aaronhurt/zfs-replicate.
 A special thanks to him for creating the original script.
 
 The biggest difference is that this script will only replicate data for the
-snapshots it creates, and any incremental ones generated after the script has been put
-into production. This is opposed to a full replication that includes all snapshots.
+snapshots it creates, and any snapshots generated after the script has been put
+into production. This is different than a full (`-R`) replication that includes all snapshots.
 It only uses `-I` for incremental sends, and no flags for initial sends. This means
 you should be free to create/destroy/manage snapshots on either side, as long as you stay
 away from the `autorep-*` naming scheme, and dont overlap snapshot names.
