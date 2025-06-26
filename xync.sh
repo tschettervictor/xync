@@ -27,6 +27,7 @@ REPLICATE_SETS=${REPLICATE_SETS:-""} ## default empty
 ALLOW_ROOT_DATASETS="${ALLOW_ROOT_DATASETS:-0}"
 ALLOW_RECONCILIATION="${ALLOW_RECONCILIATION:-0}"
 RECURSE_CHILDREN="${RECURSE_CHILDREN:-0}"
+SNAP_PATTERN="${SNAP_PATTERN:-"@autorep-"}"
 SNAP_KEEP="${SNAP_KEEP:-2}"
 SYSLOG="${SYSLOG:-1}"
 SYSLOG_FACILITY="${SYSLOG_FACILITY:-"user"}"
@@ -39,13 +40,15 @@ FIND="${FIND:-$(which find || true)}"
 SSH="${SSH:-$(which ssh || true)}"
 ZFS="${ZFS:-$(which zfs || true)}"
 ZFS_INCR_OPT="${ZFS_INCR_OPT:-"-I"}"
-ZFS_SEND_OPTS="${ZFS_SEND_OPTS:-""}"
+ZFS_SEND_OPTS="${ZFS_SEND_OPTS:-"-p"}"
 ZFS_RECV_OPTS="${ZFS_RECV_OPTS:-"-vF"}"
 HOST_CHECK="${HOST_CHECK:-"ping -c1 -q -W2 %HOST%"}"
 ## temp path used for lock files
 TMPDIR="${TMPDIR:-"/tmp"}"
 ## temp file to store dataset list
 DATASETS=$(mktemp)
+SRC_SNAPS=$(mktemp)
+DST_SNAPS=$(mktemp)
 ## init values used in snapCreate and exitClean
 __PAIR_COUNT=0
 __PAIR_SKIP_COUNT=0
@@ -104,7 +107,7 @@ exitClean() {
   if [ "$__PAIR_SKIP_COUNT" -gt 0 ] || [ "$__DATASET_SKIP_COUNT" -gt 0 ]; then
     status="WARNING"
   fi
-  logMsg=$(printf "%s\ntotal sets: %d skipped: %d\ndatasets processed: %d skipped: %d" "$status" "$__PAIR_COUNT" "$__PAIR_SKIP_COUNT" "$__DATASET_COUNT" "$__DATASET_SKIP_COUNT")
+  logMsg=$(printf "%s: total sets=%d skipped=%d total datasets=%d skipped=%d" "$status" "$__PAIR_COUNT" "$__PAIR_SKIP_COUNT" "$__DATASET_COUNT" "$__DATASET_SKIP_COUNT")
   ## build and print error message
   if [ "$exitCode" -ne 0 ]; then
     status="ERROR"
@@ -122,7 +125,7 @@ exitClean() {
   clearLock "${TMPDIR}/.replicate.snapshot.lock"
   clearLock "${TMPDIR}/.replicate.send.lock"
   ## remove DATASETS tmp file
-  rm "$DATASETS"
+  rm "$DATASETS" "$SRC_SNAPS" "$DST_SNAPS"
   ## print log message and exit
   printf "%s\n" "$logMsg" 1>&2
   exit "$exitCode"
@@ -230,38 +233,44 @@ snapSend() {
   checkLock "${TMPDIR}/.replicate.send.lock"
   if [ -n "$srcHost" ]; then
     if [ -n "$base" ]; then
-      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
+      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     else
       if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     fi
   elif [ -n "$dstHost" ]; then
     if [ -n "$base" ]; then
       if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     else
       if ! $ZFS send $ZFS_SEND_OPTS "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     fi
   elif [ -z "$srcHost" ] && [ -z "$dstHost" ]; then
     if [ -n "$base" ]; then
       if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     else
       if ! $ZFS send $ZFS_SEND_OPTS "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then
         snapDestroy "${src}@${name}" "$srcHost"
-        exitClean 128 "failed to send snapshot: ${src}@${name}"
+        printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
+        __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
       fi
     fi
   fi
@@ -273,6 +282,7 @@ snapSend() {
 snapList() {
   set=$1
   host=$2
+  pattern=$3
   printf "listing snapshots for set: %s\n" "$set" 1>&2
   ## build send command
   if [ -n "$host" ]; then
@@ -280,8 +290,11 @@ snapList() {
   else
     snaps=$($ZFS list -H -o name -s creation -t snapshot "$set") || true
   fi
-  ## filter snaps matching our pattern
-  printf "%s\n" "$snaps" | grep "@autorep-" || true
+  if [ -n "$pattern" ]; then
+    printf "%s\n" "$snaps" | grep "$pattern" || true
+  else
+    printf "%s\n" "$snaps" || true
+  fi
 }
 
 ## create source snapshots
@@ -293,12 +306,16 @@ snapCreate() {
   if [ -n "$host" ]; then
     if ! $SSH $host "$ZFS snapshot \"${set}@${name}\""; then
       snapDestroy "${set}@${name}" "$host"
-      exitClean 128 "failed to create snapshot: ${set}@${name}"
+      printf "WARNING: failed to create snapshot: %s\n" "${set}@${name}" 1>&2
+      __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
+      continue
     fi
   else
     if ! $ZFS snapshot "${src}@${name}"; then
       snapDestroy "${src}@${name}" "$srcHost"
-      exitClean 128 "failed to create snapshot: ${src}@${name}"
+      printf "WARNING: failed to create snapshot: %s\n" "${set}@${name}" 1>&2
+      __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
+      continue
     fi
   fi
 }
@@ -353,7 +370,7 @@ snapInit() {
     if [ "$RECURSE_CHILDREN" -eq 1 ]; then
       getDatasets "$src" "$srcHost" > "$DATASETS"
     else
-      ech "$src" > "$DATASETS"
+      echo "$src" > "$DATASETS"
     fi
     ## set main destination dataset
     ## needed so we dont add $dst on top of itself
@@ -369,16 +386,19 @@ snapInit() {
       ## if not, create it
       checkDataset "$dst" "$dstHost" || createDataset "$dst" "$dstHost"
       ## get source and destination snapshots
-      srcSnaps=$(snapList "$src" "$srcHost")
-      dstSnaps=$(snapList "$dst" "$dstHost")
-      for snap in $srcSnaps; do
+      srcSnaps=$(snapList "$src" "$srcHost" "$SNAP_PATTERN")
+      dstSnaps=$(snapList "$dst" "$dstHost" "$SNAP_PATTERN")
+      # Need a tmp file to not run in subshell
+      echo "$srcSnaps" | sort -r > "$SRC_SNAPS"
+      echo "$dstSnaps" > "$DST_SNAPS"
+      while read -r snap; do
         ## while we are here...check for our current snap name
         if [ "$snap" = "${src}@${name}" ]; then
           ## looks like it's here...we better kill it
           printf "destroying duplicate snapshot: %s@%s\n" "$src" "$name" 1>&2
           snapDestroy "${src}@${name}" "$srcHost"
         fi
-      done
+      done < "$SRC_SNAPS"
       ## get source and destination snap count
       srcSnapCount=0
       dstSnapCount=0
@@ -392,18 +412,18 @@ snapInit() {
       ## number of snapshots and the base source snapshot exists in destination dataset
       base=""
       if [ "$srcSnapCount" -ge 1 ] && [ "$dstSnapCount" -ge 1 ]; then
-        ## get most recent source snapshot
-        ss=$(printf "%s\n" "$srcSnaps" | tail -n 1)
-        ## get source snapshot name
-        sn=$(printf "%s\n" "$ss" | cut -f2 -d@)
-        ## loop over destinations snaps and look for a match
-        for ds in $dstSnaps; do
-          dn=$(printf "%s\n" "$ds" | cut -f2 -d@)
-          if [ "$dn" = "$sn" ]; then
-            base="$ss"
-            break
-          fi
-        done
+        while read -r ss; do
+          ## get source snapshot name
+          sn=$(printf "%s\n" "$ss" | cut -f2 -d@)
+          ## loop over destinations snaps and look for a match
+          while read -r ds; do
+            dn=$(printf "%s\n" "$ds" | cut -f2 -d@)
+            if [ "$dn" = "$sn" ]; then
+              base="$ss"
+              break 2
+            fi
+          done < "$DST_SNAPS"
+        done < "$SRC_SNAPS"
         ## no matching base, are we allowed to fallback?
         if [ -z "$base" ] && [ "$ALLOW_RECONCILIATION" -ne 1 ]; then
           temps=$(printf "source snapshot '%s' not in destination dataset: %s" "$ss" "$dst")
@@ -418,13 +438,15 @@ snapInit() {
         ## allowed to prune remote dataset?
         if [ "$ALLOW_RECONCILIATION" -ne 1 ]; then
           temps="destination contains snapshots not in source - set 'ALLOW_RECONCILIATION=1' to prune snapshots"
-          printf "WARNING: skipping dataset '%s' - %s\n" "$pair" "$temps" 1>&2
+          printf "WARNING: skipping dataset '%s' - %s\n" "$dataset" "$temps" 1>&2
           __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
           continue
         fi
         ## prune destination snapshots
-        printf "pruning destination snapshots: %s\n" "$dstSnaps" 1>&2
-        for snap in $dstSnaps; do
+        dstSnapsAll=$(snapList "$dst" "$dstHost" "")
+        printf "pruning destination snapshots: %s\n" "$dstSnapsAll" 1>&2
+        ## prune ALL snaps on destination
+        printf "%s\n" "$dstSnapsAll" | while read -r snap; do
           snapDestroy "$snap" "$dstHost"
         done
       fi
@@ -494,7 +516,7 @@ subTags() {
 showStatus() {
   log=$(sortLogs | head -n 1)
   if [ -n "$log" ]; then
-    printf "%s\n" "$(cat "${log}" | tail -n 3)" && exit 0
+    printf "%s\n" "$(cat "${log}" | tail -n 1)" && exit 0
   fi
   ## not found, log error and exit
   writeLog "ERROR: unable to find most recent log file, cannot print status" && exit 1
@@ -565,6 +587,7 @@ loadConfig() {
   readonly ALLOW_ROOT_DATASETS
   readonly ALLOW_RECONCILIATION
   readonly RECURSE_CHILDREN
+  readonly SNAP_PATTERN
   readonly SNAP_KEEP
   readonly SYSLOG
   readonly SYSLOG_FACILITY
@@ -608,6 +631,8 @@ loadConfig() {
     writeLog "ERROR: unable to locate system zfs binary" && exit 1
   fi
 }
+
+trap  'exitClean 128 "script terminated prematurely"' INT SIGINT SIGTERM SIGQUIT SIGSEGV
 
 ## main function, not much here
 main() {
