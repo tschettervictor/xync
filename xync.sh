@@ -302,6 +302,19 @@ snapCreate() {
   name=$1
   set=$2
   host=$3
+  # check if the snapshot already exists - this allows
+  # same source dataset to be replicated to multiple destinations
+  if [ -n "$host" ]; then
+    if $SSH $host "$ZFS list -t snapshot \"${set}@${name}\"" >/dev/null 2>&1; then
+      printf "Snapshot already exists, continuing: %s\n" "${set}@${name}" 1>&2
+      return 0
+    fi
+  else
+    if $ZFS list -t snapshot "${set}@${name}" >/dev/null 2>&1; then
+      printf "Snapshot already exists, continuing: %s\n" "${set}@${name}" 1>&2
+      return 0
+    fi
+  fi
   printf "creating snapshot: %s\n" "${set}@${name}" 1>&2
   if [ -n "$host" ]; then
     if ! $SSH $host "$ZFS snapshot \"${set}@${name}\""; then
@@ -391,14 +404,6 @@ snapInit() {
       # Need a tmp file to not run in subshell
       echo "$srcSnaps" | sort -r > "$SRC_SNAPS"
       echo "$dstSnaps" > "$DST_SNAPS"
-      while read -r snap; do
-        ## while we are here...check for our current snap name
-        if [ "$snap" = "${src}@${name}" ]; then
-          ## looks like it's here...we better kill it
-          printf "destroying duplicate snapshot: %s@%s\n" "$src" "$name" 1>&2
-          snapDestroy "${src}@${name}" "$srcHost"
-        fi
-      done < "$SRC_SNAPS"
       ## get source and destination snap count
       srcSnapCount=0
       dstSnapCount=0
