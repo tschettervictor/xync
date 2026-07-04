@@ -39,7 +39,7 @@ LOGGER="${LOGGER:-$(which logger || true)}"
 FIND="${FIND:-$(which find || true)}"
 SSH="${SSH:-$(which ssh || true)}"
 ZFS="${ZFS:-$(which zfs || true)}"
-ZFS_INCR_OPT="${ZFS_INCR_OPT:-"-I"}"
+ZFS_INCR_OPTS="${ZFS_INCR_OPTS:-"-I"}"
 ZFS_SEND_OPTS="${ZFS_SEND_OPTS:-"-p"}"
 ZFS_RECV_OPTS="${ZFS_RECV_OPTS:-"-vF"}"
 HOST_CHECK="${HOST_CHECK:-"ping -c1 -q -W2 %HOST%"}"
@@ -233,7 +233,7 @@ snapSend() {
   checkLock "${TMPDIR}/.replicate.send.lock"
   if [ -n "$srcHost" ]; then
     if [ -n "$base" ]; then
-      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then
+      if ! $SSH $srcHost "$ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPTS \"$base\" \"$src@$snap\"" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then
         snapDestroy "${src}@${name}" "$srcHost"
         printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
         __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
@@ -247,7 +247,7 @@ snapSend() {
     fi
   elif [ -n "$dstHost" ]; then
     if [ -n "$base" ]; then
-      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
+      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPTS "$base" "$src@$snap" | $SSH $dstHost "$ZFS receive $ZFS_RECV_OPTS \"$dst\""; then
         snapDestroy "${src}@${name}" "$srcHost"
         printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
         __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
@@ -261,7 +261,7 @@ snapSend() {
     fi
   elif [ -z "$srcHost" ] && [ -z "$dstHost" ]; then
     if [ -n "$base" ]; then
-      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPT "$base" "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
+      if ! $ZFS send $ZFS_SEND_OPTS $ZFS_INCR_OPTS "$base" "$src@$snap" | $ZFS receive $ZFS_RECV_OPTS "$dst"; then 
         snapDestroy "${src}@${name}" "$srcHost"
         printf "WARNING: failed to send snapshot: %s\n" "${src}@${name}" 1>&2
         __DATASET_SKIP_COUNT=$((__DATASET_SKIP_COUNT + 1))
@@ -580,7 +580,7 @@ loadConfig() {
   if [ -f "$configFile" ]; then
     # shellcheck disable=SC1090
     . "$configFile"
-  elif configFile="${SCRIPT_PATH}/config.sh" && [ -f "$configFile" ]; then
+  elif configFile="${SCRIPT_PATH}/xync.conf" && [ -f "$configFile" ]; then
     # shellcheck disable=SC1090
     . "$configFile"
   fi

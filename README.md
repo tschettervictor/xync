@@ -27,7 +27,7 @@ just manually fixed it, but I want to automate this as much as possible.
 - Supports multiple pool/dataset pairs to replicate.
 - Supports divergence detection and reconciliation of destination datasets.
 - Logging leverages syslog (via logger) by default, but local logging may be configured.
-- Includes a well documented `config.sh` file that may be used as configuration or as reference for environment
+- Includes a well documented `xync.conf` file that may be used as configuration or as reference for environment
   variables passed to the script.
 - May be run on any schedule using cron or similar mechanism.
 - Fully source compliant and may be used by other scripts.
@@ -46,7 +46,7 @@ the destination system.
 ## Configuration
 
 Configuration is done via an optional config file, or as environment variables. Most options have sane
-defaults to keep configuration to a minimum. The script will attempt to locate a file called `config.sh`
+defaults to keep configuration to a minimum. The script will attempt to locate a file called `xync.conf`
 in the same directory as the script if one is not passed via the command line.
 
 The config file is very well commented. The only required setting without a default is the `REPLICATE_SETS` option.
